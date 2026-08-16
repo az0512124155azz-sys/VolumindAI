@@ -13,8 +13,8 @@ android {
         applicationId = "com.volumind.remote"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
     }
     buildFeatures { compose = true; buildConfig = true }
     buildTypes {
@@ -43,4 +43,3 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.7.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
-

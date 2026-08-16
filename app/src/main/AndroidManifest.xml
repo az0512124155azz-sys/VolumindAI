@@ -3,9 +3,11 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
         android:label="Volumind Remote"
         android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@style/AppTheme"
+        android:roundIcon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="false">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
@@ -15,4 +17,3 @@
         </activity>
     </application>
 </manifest>
-

@@ -1,6 +1,6 @@
 package com.volumind.remote
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -49,7 +50,9 @@ private val Canvas = Color(0xFFF4F6F7)
 
 @Composable private fun Header(status: String, connected: Boolean) {
     Surface(shadowElevation = 2.dp) { Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(38.dp).background(Accent, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) { Text("M", color = Color.White, fontWeight = FontWeight.Black) }
+        Surface(color = Color(0xFFF0F3F5), shape = RoundedCornerShape(12.dp), modifier = Modifier.size(42.dp)) {
+            Image(painterResource(R.drawable.volumind_logo), "לוגו Volumind", modifier = Modifier.padding(3.dp))
+        }
         Spacer(Modifier.width(11.dp)); Column { Text("Volumind Remote", fontWeight = FontWeight.Bold); Text(status, style = MaterialTheme.typography.labelSmall, color = if (connected) Color(0xFF25845A) else Color.Gray) }
     } }
 }
