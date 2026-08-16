@@ -39,14 +39,26 @@ wss.on('connection', ws => {
         const secret = String(msg.deviceSecret || '');
         if (secret.length < 32) return reject(ws, 'Weak device secret');
         const previous = codes.get(code);
-        if (previous && !safeEqual(previous.secret, secret)) return reject(ws, 'Pairing code already in use');
-        const room = previous?.room || randomUUID(); codes.set(code, {room, secret, expires:Date.now()+24*60*60_000});
+        const sameOwner = previous && safeEqual(previous.secret, secret);
+        const previousDesktop = previous ? clients.get(`${previous.room}:desktop`) : null;
+        if (previous && !sameOwner && previousDesktop?.readyState === WebSocket.OPEN) return reject(ws, 'Pairing code already in use');
+        if (previous && !sameOwner) {
+          const staleMobile = clients.get(`${previous.room}:mobile`);
+          if (staleMobile?.readyState === WebSocket.OPEN) staleMobile.close(4001, 'Pairing code refreshed');
+        }
+        const room = sameOwner ? previous.room : randomUUID(); codes.set(code, {room, secret, expires:Date.now()+24*60*60_000});
+        const oldDesktop = clients.get(`${room}:desktop`);
+        if (oldDesktop && oldDesktop !== ws && oldDesktop.readyState === WebSocket.OPEN) oldDesktop.close(4002, 'Desktop reconnected');
         ws.auth = {role:'desktop', room}; clients.set(`${room}:desktop`, ws); send(ws, {type:'authenticated', role:'desktop', room});
         send(clients.get(`${room}:mobile`), {type:'presence', desktopConnected:true});
         send(ws, {type:'presence', mobileConnected:clients.get(`${room}:mobile`)?.readyState === WebSocket.OPEN}); return;
       }
       if (msg.role === 'mobile') {
         const pair = codes.get(code); if (!pair || pair.expires < Date.now()) return reject(ws, 'Pairing code expired');
+        const desktop = clients.get(`${pair.room}:desktop`);
+        if (!desktop || desktop.readyState !== WebSocket.OPEN) return reject(ws, 'Fusion connector is offline');
+        const oldMobile = clients.get(`${pair.room}:mobile`);
+        if (oldMobile && oldMobile !== ws && oldMobile.readyState === WebSocket.OPEN) oldMobile.close(4003, 'Mobile reconnected');
         ws.auth = {role:'mobile', room:pair.room}; clients.set(`${pair.room}:mobile`, ws); send(ws, {type:'authenticated', role:'mobile'});
         send(ws, {type:'presence', desktopConnected:clients.get(`${pair.room}:desktop`)?.readyState === WebSocket.OPEN});
         send(clients.get(`${pair.room}:desktop`), {type:'presence', mobileConnected:true}); return;

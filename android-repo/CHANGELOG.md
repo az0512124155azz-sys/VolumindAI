@@ -1,5 +1,13 @@
 # Volumind releases
 
+## Android 0.4.1 / Fusion add-in 3.2.1
+
+- A pairing code is now marked active only after the relay confirms desktop authentication.
+- Stale relay registrations no longer make a valid Fusion code unusable after reconnecting.
+- Fusion settings show separate Windows bridge and mobile connection lamps.
+- The Android app translates pairing and offline errors into clear Hebrew messages.
+- Invalid or underspecified Ollama build plans are retried once and then repaired to a safe three-stage plan.
+
 ## Android 0.4.0 / Fusion add-in 3.2.0
 
 - The Fusion pairing code is persisted across restarts.

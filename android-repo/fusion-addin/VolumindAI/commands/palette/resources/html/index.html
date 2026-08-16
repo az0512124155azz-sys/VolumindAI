@@ -110,7 +110,7 @@ $('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.pr
   shortcutNote.innerHTML='<b>פתיחה מהירה: Shift+Q</b><br>להגדרה חד־פעמית: לחץ על ⋯ ליד Volumind בסרגל של Fusion, בחר Change Keyboard Shortcut והקש Shift+Q. האות Q לבדה נשארת Press Pull.';
   note.insertAdjacentElement('afterend', shortcutNote);
   const remoteNote = document.createElement('div'); remoteNote.className='note'; remoteNote.style.marginTop='10px';
-  remoteNote.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><span id="mobileLamp" style="width:10px;height:10px;border-radius:50%;background:#a9b1b6;box-shadow:0 0 0 3px #a9b1b622"></span><b id="mobileState">האפליקציה לא מחוברת</b></div>קוד הצימוד הקבוע: <span id="pairingCode" dir="ltr" style="font-size:22px;font-weight:800;letter-spacing:3px">טוען…</span><br><span style="font-size:10px">הפעל את מחבר Windows והזן את הקוד באפליקציה. הקוד לא משתנה בהפעלה מחדש.</span>';
+  remoteNote.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><span id="bridgeLamp" style="width:10px;height:10px;border-radius:50%;background:#a9b1b6"></span><b id="bridgeState">מחבר Windows לא מחובר</b></div><div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><span id="mobileLamp" style="width:10px;height:10px;border-radius:50%;background:#a9b1b6"></span><b id="mobileState">האפליקציה לא מחוברת</b></div>קוד צימוד פעיל: <span id="pairingCode" dir="ltr" style="font-size:22px;font-weight:800;letter-spacing:3px">לא פעיל</span><br><span style="font-size:10px">הקוד יוצג רק לאחר שה־Relay אישר את מחבר Windows.</span>';
   shortcutNote.insertAdjacentElement('afterend', remoteNote);
 
   function fusionCall(action, data={}) {
@@ -120,8 +120,13 @@ $('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.pr
   }
   async function loadRemoteStatus(){
     const result=await fusionCall('remoteStatus');
-    $('pairingCode').textContent=result.ok?result.pairing_code:'לא זמין';
+    $('pairingCode').textContent=result.ok&&result.relay_registered?result.pairing_code:'לא פעיל';
+    updateBridgeStatus(Boolean(result.ok&&result.relay_registered),result.relay_message||'');
     updateMobilePresence(Boolean(result.ok&&result.mobile_connected));
+  }
+  function updateBridgeStatus(registered,message){
+    $('bridgeState').textContent=message||(registered?'מחבר Windows מחובר לשרת':'מחבר Windows לא מחובר');
+    $('bridgeLamp').style.background=registered?'#28a66a':'#d18a30';
   }
   function updateMobilePresence(connected){
     $('mobileState').textContent=connected?'האפליקציה מחוברת':'האפליקציה לא מחוברת';
@@ -253,6 +258,7 @@ $('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.pr
       return'OK';
     }
     if(action==='remotePresence'){updateMobilePresence(Boolean(result.connected));return'OK'}
+    if(action==='remoteBridgeStatus'){updateBridgeStatus(Boolean(result.registered),result.message||'');loadRemoteStatus();return'OK'}
     if(action==='aiResult'){
       if(!result.ok){fail(result.error);return'error'}
       if(result.operation==='analyze') result.questions.length?renderQuestions(result.questions):requestPlan();

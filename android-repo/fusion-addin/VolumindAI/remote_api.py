@@ -20,6 +20,8 @@ _server = None
 _thread = None
 _app = None
 _mobile_connected = False
+_relay_registered = False
+_relay_message = "מחבר Windows לא מחובר"
 
 
 def _settings_path():
@@ -79,14 +81,17 @@ class Handler(BaseHTTPRequestHandler):
         return _json(self, 404, {"ok": False, "error": "not found"})
 
     def do_POST(self):
-        if self.path not in ("/command", "/stop", "/answers", "/presence"):
+        if self.path not in ("/command", "/stop", "/answers", "/presence", "/bridge-status"):
             return _json(self, 404, {"ok": False, "error": "not found"})
         try:
             size = int(self.headers.get("Content-Length", "0"))
             if size > 8 * 1024 * 1024:
                 return _json(self, 413, {"ok": False, "error": "payload too large"})
             data = json.loads(self.rfile.read(size) or b"{}")
-            kind = {"/command": "command", "/stop": "stop", "/answers": "answers", "/presence": "presence"}[self.path]
+            kind = {
+                "/command": "command", "/stop": "stop", "/answers": "answers",
+                "/presence": "presence", "/bridge-status": "bridge_status",
+            }[self.path]
             _commands.put_nowait({"kind": kind, "data": data})
             _app.fireCustomEvent(EVENT_ID, "{}")
             return _json(self, 202, {"ok": True, "accepted": True})
@@ -145,3 +150,13 @@ def set_mobile_connected(connected):
 
 def mobile_connected():
     return _mobile_connected
+
+
+def set_bridge_status(registered, message=""):
+    global _relay_registered, _relay_message
+    _relay_registered = bool(registered)
+    _relay_message = str(message or ("מחבר Windows מחובר לשרת" if registered else "מחבר Windows לא מחובר"))[:240]
+
+
+def bridge_status():
+    return {"registered": _relay_registered, "message": _relay_message}

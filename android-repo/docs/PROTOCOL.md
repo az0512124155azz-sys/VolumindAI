@@ -1,10 +1,10 @@
 # Volumind Remote protocol
 
-All internet traffic uses JSON over `wss://`. The relay accepts at most 5 MiB per message.
+All internet traffic uses JSON over `wss://`. The relay accepts at most 8 MiB per message.
 
 ## Pairing
 
-Desktop authenticates first with `role=desktop`, a random 32-character device secret and a six-digit pairing code. Mobile uses the same one-time code within ten minutes. The code is deleted immediately after pairing.
+Desktop authenticates first with `role=desktop`, a persistent 32-character device secret and a persistent six-digit pairing code. The bridge reports the code as active only after the relay returns `authenticated`. Mobile can authenticate only while the matching desktop connector is online. Stale registrations can be reclaimed after the previous desktop disconnects.
 
 ## Mobile to Fusion
 
@@ -22,4 +22,3 @@ Desktop authenticates first with `role=desktop`, a random 32-character device se
 - `error` — a safe user-facing failure message.
 
 The public relay does not call Fusion or Ollama. The Windows bridge connects outward to WSS and talks to the Fusion add-in only at `127.0.0.1:8765`.
-

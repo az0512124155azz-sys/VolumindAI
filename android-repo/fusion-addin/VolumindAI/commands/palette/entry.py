@@ -217,6 +217,9 @@ def remote_command(_args):
         elif kind == "presence":
             remote_api.set_mobile_connected(data.get("mobileConnected", False))
             _send("remotePresence", {"connected": remote_api.mobile_connected()})
+        elif kind == "bridge_status":
+            remote_api.set_bridge_status(data.get("registered", False), data.get("message", ""))
+            _send("remoteBridgeStatus", remote_api.bridge_status())
         if len(_remote_ui_queue) > 32:
             del _remote_ui_queue[:-32]
 
@@ -302,6 +305,10 @@ def _ollama(serial, operation, payload):
             user = "USER REQUEST:\n" + request_text + "\n\nANSWERS:\n" + json.dumps(payload.get("answers", {}), ensure_ascii=False)
             if attachment_text:
                 user += "\n\nATTACHMENTS:\n" + attachment_text
+            if payload.get("plan_retry"):
+                user += ("\n\nYOUR PREVIOUS RESPONSE WAS INVALID OR HAD FEWER THAN TWO COMPLETE STEPS:\n" +
+                         str(payload.get("invalid_plan", ""))[:2000] +
+                         "\nReturn ONLY the required JSON object. Include 3-6 steps, and every step MUST contain non-empty title and goal strings.")
             predict = 750
         elif operation == "step":
             system = STEP_PROMPT
@@ -433,11 +440,14 @@ def palette_incoming(args):
                 args.returnData = json.dumps({"ok": True, "saved": False}, ensure_ascii=False)
             return
         if args.action == "remoteStatus":
+            bridge = remote_api.bridge_status()
             args.returnData = json.dumps({
                 "ok": True,
                 "pairing_code": remote_api.pairing_code(),
                 "local_api": "127.0.0.1:8765",
                 "mobile_connected": remote_api.mobile_connected(),
+                "relay_registered": bridge["registered"],
+                "relay_message": bridge["message"],
             }, ensure_ascii=False)
             return
         if args.action == "remotePoll":
@@ -473,15 +483,42 @@ def worker_result(args):
                     })
             _send("aiResult", {"ok": True, "operation": "analyze", "questions": normalized})
         elif operation == "plan":
-            parsed = _extract_json(result.get("content", ""))
+            payload = dict(result.get("payload", {}))
+            try:
+                parsed = _extract_json(result.get("content", ""))
+            except Exception:
+                if int(payload.get("plan_retry", 0)) < 1:
+                    payload["plan_retry"] = 1
+                    payload["invalid_plan"] = str(result.get("content", ""))[:2000]
+                    _start_job("plan", payload)
+                    return
+                parsed = {}
             steps = []
-            for step in parsed.get("steps", [])[:8]:
-                title = str(step.get("title", "")).strip()[:120]
-                goal = str(step.get("goal", "")).strip()[:320]
+            raw_steps = parsed if isinstance(parsed, list) else (
+                parsed.get("steps") or parsed.get("plan") or parsed.get("שלבים") or []
+            )
+            for step in raw_steps[:8]:
+                if isinstance(step, str):
+                    title = step.strip()[:120]
+                    goal = title[:320]
+                elif isinstance(step, dict):
+                    title = str(step.get("title") or step.get("name") or step.get("step") or step.get("operation") or "").strip()[:120]
+                    goal = str(step.get("goal") or step.get("description") or step.get("details") or title).strip()[:320]
+                else:
+                    continue
                 if title and goal:
                     steps.append({"title": title, "goal": goal})
             if len(steps) < 2:
-                raise ValueError("תוכנית הבנייה קצרה או לא תקינה")
+                if int(payload.get("plan_retry", 0)) < 1:
+                    payload["plan_retry"] = 1
+                    payload["invalid_plan"] = str(result.get("content", ""))[:2000]
+                    _start_job("plan", payload)
+                    return
+                steps = [
+                    {"title": "יצירת רכיב וסקיצת בסיס", "goal": "צור רכיב חדש וסקיצה פרמטרית שמגדירה את המידות והצורה הראשית."},
+                    {"title": "בניית הגוף והמאפיינים העיקריים", "goal": "הפוך את הסקיצה לגוף תלת־ממדי והוסף את המאפיינים המרכזיים של הבקשה."},
+                    {"title": "פרטים, גימור ובדיקה", "goal": "הוסף פתחים וגימורי קצוות נדרשים, התאם תצוגה ובדוק את המודל הסופי."},
+                ]
             _send("aiResult", {"ok": True, "operation": "plan", "steps": steps})
         elif operation == "step":
             if not _build_env:

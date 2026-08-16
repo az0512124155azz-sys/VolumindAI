@@ -37,11 +37,17 @@ def local_post(path, body):
     with urllib.request.urlopen(request, timeout=10) as response:
         return json.loads(response.read())
 
+def report_bridge_status(registered, message):
+    try: local_post("/bridge-status", {"registered":registered,"message":message})
+    except Exception: pass
+
 def on_open(ws):
     pairing_code = local_get("/pairing")["pairingCode"]
+    ws.pairing_code = pairing_code
+    ws.forwarder_started = False
     ws.send(json.dumps({"type":"authenticate","role":"desktop","pairingCode":pairing_code,"deviceSecret":DEVICE_SECRET}))
-    print(f"Pairing code from Fusion: {pairing_code}", flush=True)
-    threading.Thread(target=forward_fusion_events, args=(ws,), daemon=True).start()
+    report_bridge_status(False, "ממתין לאישור קוד הצימוד מהשרת")
+    print("Registering Fusion pairing code with relay...", flush=True)
 
 def forward_fusion_events(ws):
     """Long-poll newline-delimited events emitted by the local Fusion add-in."""
@@ -57,7 +63,13 @@ def forward_fusion_events(ws):
 
 def on_message(ws, raw):
     message = json.loads(raw)
-    if message.get("type") == "chat.command":
+    if message.get("type") == "authenticated" and message.get("role") == "desktop":
+        report_bridge_status(True, "מחבר Windows מחובר לשרת · הקוד פעיל")
+        print(f"Pairing code ACTIVE: {ws.pairing_code}", flush=True)
+        if not ws.forwarder_started:
+            ws.forwarder_started = True
+            threading.Thread(target=forward_fusion_events, args=(ws,), daemon=True).start()
+    elif message.get("type") == "chat.command":
         threading.Thread(target=lambda: local_post("/command", message), daemon=True).start()
     elif message.get("type") == "build.stop":
         threading.Thread(target=lambda: local_post("/stop", message), daemon=True).start()
@@ -65,11 +77,17 @@ def on_message(ws, raw):
         threading.Thread(target=lambda: local_post("/answers", message), daemon=True).start()
     elif message.get("type") == "presence":
         threading.Thread(target=lambda: local_post("/presence", message), daemon=True).start()
+    elif message.get("type") == "error":
+        reason = str(message.get("message", "Relay rejected the connection"))
+        report_bridge_status(False, "השרת דחה את הקוד: " + reason)
+        print(f"Relay rejected pairing: {reason}", flush=True)
 
 def on_error(_ws, error):
+    report_bridge_status(False, "שגיאת חיבור לשרת: " + str(error))
     print(f"Connection error: {error}", flush=True)
 
 def on_close(_ws, code, reason):
+    report_bridge_status(False, "מחבר Windows נותק מהשרת")
     print(f"Disconnected from relay ({code}): {reason}", flush=True)
 
 def main():
