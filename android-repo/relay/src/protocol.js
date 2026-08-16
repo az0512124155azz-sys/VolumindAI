@@ -1,5 +1,5 @@
 export const allowedTypes = new Set([
-  'chat.command', 'chat.message', 'build.plan', 'build.step', 'build.stop',
+  'chat.command', 'chat.message', 'build.plan', 'build.step', 'build.start', 'build.stop',
   'fusion.screenshot', 'questionnaire', 'questionnaire.answer', 'presence', 'error'
 ]);
 

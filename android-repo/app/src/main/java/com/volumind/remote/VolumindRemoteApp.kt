@@ -7,6 +7,7 @@ import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -43,30 +44,25 @@ private val Canvas = Color(0xFFF4F6F7)
     val context = LocalContext.current
     val client = remember { RelayClient(context.applicationContext) }
     val state by client.state.collectAsStateWithLifecycle()
-    var tab by remember { mutableIntStateOf(0) }
     MaterialTheme(colorScheme = lightColorScheme(primary = Accent, background = Canvas, surface = Color.White, onSurface = Ink)) {
         Scaffold(
-            topBar = { Header(state.connection, state.fusionOnline) },
-            bottomBar = {
-                NavigationBar(containerColor = Color.White) {
-                    NavigationBarItem(tab == 0, { tab = 0 }, { Icon(Icons.Default.ChatBubbleOutline, null) }, { Text("צ׳אט") })
-                    NavigationBarItem(tab == 1, { tab = 1 }, { Icon(Icons.Default.ViewInAr, null) }, { Text("מודל חי") })
-                }
-            }, containerColor = Canvas
+            topBar = { Header(state.connection, state.fusionOnline) }, containerColor = Canvas
         ) { padding ->
             if (!state.paired) PairScreen(Modifier.padding(padding), state.connection, client::connect)
-            else if (tab == 0) ChatScreen(Modifier.padding(padding), state, client::sendChat, client::stopBuild, client::submitAnswers)
-            else LiveModelScreen(Modifier.padding(padding), state)
+            else ChatScreen(Modifier.padding(padding), state, client::sendChat, client::startBuild, client::stopBuild, client::submitAnswers)
         }
     }
 }
 
 @Composable private fun Header(status: String, connected: Boolean) {
-    Surface(shadowElevation = 2.dp) { Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+    Surface(shadowElevation = 2.dp) { Column {
+      Row(Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=12.dp), verticalAlignment = Alignment.CenterVertically) {
         Surface(color = Color(0xFFF0F3F5), shape = RoundedCornerShape(12.dp), modifier = Modifier.size(42.dp)) {
             Image(painterResource(R.drawable.volumind_mark_2026), "לוגו Volumind החדש", modifier = Modifier.padding(3.dp))
         }
-        Spacer(Modifier.width(11.dp)); Column { Text("Volumind Remote", fontWeight = FontWeight.Bold); Text(status, style = MaterialTheme.typography.labelSmall, color = if (connected) Color(0xFF25845A) else Color.Gray) }
+        Spacer(Modifier.width(11.dp)); Column { Text("Volumind", fontWeight = FontWeight.Bold); Text("CAD assistant", style = MaterialTheme.typography.labelSmall, color = Color.Gray) }
+      }
+      Surface(color=Color(0xFFF9FAFB)){Row(Modifier.fillMaxWidth().padding(vertical=7.dp),horizontalArrangement=Arrangement.Center,verticalAlignment=Alignment.CenterVertically){Box(Modifier.size(7.dp).background(if(connected)Color(0xFF2A9B67) else Color(0xFFD18A30),RoundedCornerShape(99.dp)));Spacer(Modifier.width(7.dp));Text(status,style=MaterialTheme.typography.labelSmall,color=Color(0xFF68757E))}}
     } }
 }
 
@@ -98,7 +94,7 @@ private fun readMobileAttachment(context:Context,uri:Uri):MobileAttachment{
     return MobileAttachment(name,type.ifBlank{"text/plain"},text=bytes.toString(Charsets.UTF_8).take(120000))
 }
 
-@Composable private fun ChatScreen(modifier: Modifier, state: RemoteState, send: (String,List<MobileAttachment>) -> Unit, stop: () -> Unit, submitAnswers: (Map<String,String>) -> Unit) {
+@Composable private fun ChatScreen(modifier: Modifier, state: RemoteState, send: (String,List<MobileAttachment>) -> Unit, start: () -> Unit, stop: () -> Unit, submitAnswers: (Map<String,String>) -> Unit) {
     var text by remember { mutableStateOf("") }
     var attachments by remember { mutableStateOf<List<MobileAttachment>>(emptyList()) }
     var plusOpen by remember { mutableStateOf(false) }
@@ -113,7 +109,7 @@ private fun readMobileAttachment(context:Context,uri:Uri):MobileAttachment{
         attachments=attachments+added
     }
     Column(modifier.fillMaxSize()) {
-        if (state.steps.isNotEmpty()) BuildProgress(state.steps, stop)
+        if (state.steps.isNotEmpty()) BuildProgress(state, start, stop)
         if (state.questions.isNotEmpty()) QuestionCard(state.questions, submitAnswers)
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (state.messages.isEmpty()) item { Text("שלח פקודה ל־Volumind. תוכל לראות כאן שאלות, תשובות וכל שלב בבנייה.", color = Color.Gray, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 60.dp)) }
@@ -146,12 +142,16 @@ private fun readMobileAttachment(context:Context,uri:Uri):MobileAttachment{
     } }
 }
 
-@Composable private fun BuildProgress(steps: List<BuildStep>, stop: () -> Unit) {
-    val done = steps.count { it.state == "done" }; Surface(color = Color(0xFFE7F2F5)) { Column(Modifier.fillMaxWidth().padding(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) { Text("בונה את המודל · $done/${steps.size}", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)); IconButton(stop) { Icon(Icons.Default.StopCircle, "עצור", tint = Color(0xFFC44F4F)) } }
-        LinearProgressIndicator(progress = { if (steps.isEmpty()) 0f else done.toFloat()/steps.size }, modifier = Modifier.fillMaxWidth())
-        Text(steps.firstOrNull { it.state == "running" }?.title ?: "ממתין לשלב הבא", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 7.dp))
-    } }
+@Composable private fun BuildProgress(state: RemoteState, start: () -> Unit, stop: () -> Unit) {
+    val steps=state.steps;val done=steps.count{it.state=="done"}
+    Surface(color=Color.White,shadowElevation=2.dp,modifier=Modifier.fillMaxWidth().padding(12.dp),shape=RoundedCornerShape(14.dp)){Column(Modifier.padding(14.dp)){
+        Text(if(state.awaitingApproval)"תוכנית הבנייה" else "המודל מתקדם · $done/${steps.size}",fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleMedium)
+        steps.forEachIndexed{i,step->Text("${i+1}. ${step.title}",color=if(step.state=="done")Accent else Color(0xFF66757E),modifier=Modifier.padding(top=6.dp))}
+        if(state.awaitingApproval){Button(start,enabled=state.fusionOnline,modifier=Modifier.align(Alignment.End).padding(top=12.dp)){Text("התחל לבנות ב־Fusion")}}
+        else {LinearProgressIndicator(progress={if(steps.isEmpty())0f else done.toFloat()/steps.size},modifier=Modifier.fillMaxWidth().padding(top=12.dp));Row(Modifier.fillMaxWidth().padding(top=8.dp),verticalAlignment=Alignment.CenterVertically){Text(steps.firstOrNull{it.state=="running"}?.title?:"ממתין לשלב הבא",modifier=Modifier.weight(1f),style=MaterialTheme.typography.labelMedium);IconButton(stop){Icon(Icons.Default.StopCircle,"עצור",tint=Color(0xFFC44F4F))}}
+          if(state.screenshotUrl!=null)AsyncImage(state.screenshotUrl,state.screenshotCaption,modifier=Modifier.fillMaxWidth().height(170.dp).padding(top=8.dp),contentScale=ContentScale.Fit)
+        }
+    }}
 }
 
 @Composable private fun MessageBubble(message: ChatMessage) { Row(Modifier.fillMaxWidth(), horizontalArrangement = if (message.sender == "user") Arrangement.End else Arrangement.Start) {

@@ -81,7 +81,7 @@ class Handler(BaseHTTPRequestHandler):
         return _json(self, 404, {"ok": False, "error": "not found"})
 
     def do_POST(self):
-        if self.path not in ("/command", "/stop", "/answers", "/presence", "/bridge-status"):
+        if self.path not in ("/command", "/start", "/stop", "/answers", "/presence", "/bridge-status"):
             return _json(self, 404, {"ok": False, "error": "not found"})
         try:
             size = int(self.headers.get("Content-Length", "0"))
@@ -89,7 +89,7 @@ class Handler(BaseHTTPRequestHandler):
                 return _json(self, 413, {"ok": False, "error": "payload too large"})
             data = json.loads(self.rfile.read(size) or b"{}")
             kind = {
-                "/command": "command", "/stop": "stop", "/answers": "answers",
+                "/command": "command", "/start": "start", "/stop": "stop", "/answers": "answers",
                 "/presence": "presence", "/bridge-status": "bridge_status",
             }[self.path]
             _commands.put_nowait({"kind": kind, "data": data})

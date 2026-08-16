@@ -22,7 +22,7 @@
 - `app/` — אפליקציית Android ב־Kotlin ו־Jetpack Compose.
 - `relay/` — שרת WebSocket קטן לפריסה מאחורי HTTPS/WSS.
 - `bridge/` — מחבר Windows שיוצר חיבור יוצא ומעביר פקודות לתוסף Fusion דרך localhost.
-- `fusion-addin/VolumindAI/` — תוסף Fusion 360 גרסה 3.2.1 עם API מקומי וחיבור מלא לטלפון.
+- `fusion-addin/VolumindAI/` — תוסף Fusion 360 גרסה 3.3.0 עם API מקומי וחיבור מלא לטלפון.
 
 ## הפעלה לפיתוח
 

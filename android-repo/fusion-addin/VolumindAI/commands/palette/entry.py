@@ -55,6 +55,9 @@ Decide whether essential information is missing before modeling. Ask only questi
 whose answers materially change geometry. Return strict JSON only:
 {"needs_questions":true,"questions":[{"id":"short_id","text":"question in the user's language","options":["choice 1","choice 2","Other"]}]}
 or {"needs_questions":false,"questions":[]}.
+Default to no questions when the request already states a recognizable object.
+Never ask a generic "circle, square, or triangle" / "עגול, מרובע או משולש"
+question unless the user explicitly asks to choose a cross-section or profile shape.
 Ask 1-3 questions maximum, each with 2-4 short mutually exclusive choices."""
 
 PLAN_PROMPT = COMMON_RULES + """
@@ -71,7 +74,12 @@ Generate Python for ONLY the current build step. Return one Python fenced code b
 and nothing else. Variables created by earlier steps remain available, so reuse them.
 Do not repeat earlier geometry. Keep this step small and deterministic. Rename every
 new sketch and feature immediately. Wrap the step in try/except and raise RuntimeError
-with the step name if it fails."""
+with the step name if it fails.
+Use the real Fusion Python API exactly: create extrudes through
+component.features.extrudeFeatures.createInput(...) and
+component.features.extrudeFeatures.add(input). There is NO `features.extrude` method.
+Likewise use named feature collections such as `filletFeatures`, `holeFeatures` and
+`chamferFeatures`; never invent convenience methods."""
 
 INSPECT_PROMPT = """You are Volumind's visual CAD inspector. Inspect the actual Autodesk
 Fusion viewport screenshot taken immediately after one build step. Decide whether visible
@@ -208,6 +216,8 @@ def remote_command(_args):
                 })
         elif kind == "answers":
             _remote_ui_queue.append({"kind": "answers", "answers": data.get("answers", {})})
+        elif kind == "start":
+            _remote_ui_queue.append({"kind": "start"})
         elif kind == "stop":
             _serial += 1
             _build_env = None
@@ -239,6 +249,17 @@ def _extract_json(text):
         if start_at >= 0 and end_at > start_at:
             return json.loads(cleaned[start_at:end_at + 1])
         raise ValueError("המודל לא החזיר JSON תקין")
+
+
+def _is_generic_shape_question(question, request):
+    combined = (str(question.get("text", "")) + " " + " ".join(map(str, question.get("options", [])))).lower()
+    shape_words = ("circle", "square", "triangle", "round", "עגול", "מרובע", "משולש")
+    asks_shape = any(word in combined for word in shape_words) and (
+        "shape" in combined or "צורה" in combined or sum(word in combined for word in shape_words) >= 2
+    )
+    requested = str(request or "").lower()
+    explicit = any(word in requested for word in ("shape", "profile", "cross-section", "צורה", "פרופיל", "חתך", "עגול", "מרובע", "משולש"))
+    return asks_shape and not explicit
 
 
 def _validate(code):
@@ -317,6 +338,10 @@ def _ollama(serial, operation, payload):
                     "\n\nFULL PLAN:\n" + json.dumps(payload.get("plan", []), ensure_ascii=False) +
                     "\n\nCOMPLETED STEPS:\n" + json.dumps(payload.get("completed", []), ensure_ascii=False) +
                     "\n\nCURRENT STEP:\n" + json.dumps(payload.get("step", {}), ensure_ascii=False))
+            if payload.get("step_retry"):
+                user += ("\n\nTHE PREVIOUS FUSION CODE FAILED WITH THIS ERROR:\n" +
+                         str(payload.get("repair_error", ""))[:1200] +
+                         "\nGenerate a corrected replacement for this step only. Use exact Fusion API collection names.")
             predict = 1600
             images = []
         elif operation == "inspect":
@@ -474,6 +499,8 @@ def worker_result(args):
             questions = parsed.get("questions", [])[:3] if parsed.get("needs_questions") else []
             normalized = []
             for index, question in enumerate(questions):
+                if not isinstance(question, dict) or _is_generic_shape_question(question, result.get("payload", {}).get("request", "")):
+                    continue
                 options = [str(x)[:70] for x in question.get("options", [])[:4]]
                 if len(options) >= 2:
                     normalized.append({
@@ -524,9 +551,17 @@ def worker_result(args):
             if not _build_env:
                 raise RuntimeError("סשן הבנייה בוטל")
             code = _clean_code(result.get("content", ""))
-            tree = _validate(code)
-            exec(compile(tree, "<Volumind step>", "exec"), _build_env, _build_env)
-            payload = result.get("payload", {})
+            payload = dict(result.get("payload", {}))
+            try:
+                tree = _validate(code)
+                exec(compile(tree, "<Volumind step>", "exec"), _build_env, _build_env)
+            except Exception as exc:
+                if int(payload.get("step_retry", 0)) < 1:
+                    payload["step_retry"] = 1
+                    payload["repair_error"] = str(exc)
+                    _start_job("step", payload)
+                    return
+                raise RuntimeError("Fusion לא הצליח לבצע את השלב גם לאחר תיקון אוטומטי: " + str(exc))
             step_index = int(payload.get("step_index", 0))
             screenshot = _capture(step_index)
             inspect_payload = {

@@ -73,6 +73,8 @@ def on_message(ws, raw):
         threading.Thread(target=lambda: local_post("/command", message), daemon=True).start()
     elif message.get("type") == "build.stop":
         threading.Thread(target=lambda: local_post("/stop", message), daemon=True).start()
+    elif message.get("type") == "build.start":
+        threading.Thread(target=lambda: local_post("/start", message), daemon=True).start()
     elif message.get("type") == "questionnaire.answer":
         threading.Thread(target=lambda: local_post("/answers", message), daemon=True).start()
     elif message.get("type") == "presence":

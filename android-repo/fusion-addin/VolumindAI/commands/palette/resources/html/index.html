@@ -145,6 +145,9 @@ $('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.pr
         renderProdAttachments(); $('prompt').value=item.text||''; $('send').click();
       }else if(item.kind==='answers'){
         state.answers=item.answers||{}; $('liveQuiz')?.remove(); requestPlan();
+      }else if(item.kind==='start'){
+        if(state.plan.length&& !state.session) startLiveBuild();
+        else setConnection('ממתין לתוכנית בנייה לפני התחלה',false);
       }else if(item.kind==='stop'){
         state.cancelled=true; setConnection('הבנייה נעצרה מהטלפון',false);
         $('liveNote')&&($('liveNote').textContent='הבנייה נעצרה');
@@ -224,7 +227,7 @@ $('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.pr
 
   $('send').onclick=async()=>{
     const text=$('prompt').value.trim(); if(!text&&!state.attachments.length)return;
-    $('empty')?.remove(); state.request=text||'השתמש בקבצים המצורפים'; state.answers={}; state.plan=[]; state.completed=[];
+    $('empty')?.remove(); state.request=text||'השתמש בקבצים המצורפים'; state.answers={}; state.plan=[]; state.completed=[]; state.session=null; state.cancelled=false;
     const names=state.attachments.map(a=>a.name); add('user',`${names.length?`<div style="color:#78848c;font-size:10px">📎 ${names.map(esc).join(' · ')}</div>`:''}<p>${esc(state.request)}</p>`); $('prompt').value=''; renderProdAttachments();
     setConnection('בודק אם חסר מידע…',true); const result=await fusionCall('analyze',{request:state.request,attachments:state.attachments,...params()}); if(!result.ok) fail(result.error);
   };
@@ -251,6 +254,7 @@ $('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.pr
       requestPlan();
       return'OK';
     }
+    if(action==='remoteStart'){if(state.plan.length&&!state.session)startLiveBuild();return'OK'}
     if(action==='remoteStop'){
       state.cancelled=true;
       setConnection('הבנייה נעצרה מהטלפון',false);

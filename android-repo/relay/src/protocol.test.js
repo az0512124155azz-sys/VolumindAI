@@ -5,6 +5,7 @@ import { isAllowedMessage } from './protocol.js';
 test('allows protocol messages used by the mobile app', () => {
   assert.equal(isAllowedMessage({type:'chat.command', text:'build a stand'}), true);
   assert.equal(isAllowedMessage({type:'fusion.screenshot', url:'https://example.test/shot'}), true);
+  assert.equal(isAllowedMessage({type:'build.start'}), true);
   assert.equal(isAllowedMessage({type:'presence', mobileConnected:true}), true);
 });
 

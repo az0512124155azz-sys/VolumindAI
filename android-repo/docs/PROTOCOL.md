@@ -2,6 +2,8 @@
 
 All internet traffic uses JSON over `wss://`. The relay accepts at most 8 MiB per message.
 
+After Fusion publishes `build.plan`, the mobile app sends `build.start` only when the user presses the approval button. The bridge forwards it to the loopback Fusion API at `/start`.
+
 ## Pairing
 
 Desktop authenticates first with `role=desktop`, a persistent 32-character device secret and a persistent six-digit pairing code. The bridge reports the code as active only after the relay returns `authenticated`. Mobile can authenticate only while the matching desktop connector is online. Stale registrations can be reclaimed after the previous desktop disconnects.

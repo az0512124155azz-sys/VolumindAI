@@ -1,5 +1,12 @@
 # Volumind releases
 
+## Android 0.5.0 / Fusion add-in 3.3.0
+
+- The mobile plan now has a real **Start building in Fusion** approval button.
+- The phone uses the same single-chat layout as the Fusion palette; there is no phone settings screen or separate live-model tab.
+- Generic circle/square/triangle questions are filtered unless the user explicitly requests a profile shape.
+- Fusion feature API failures receive one automatic corrected-code retry before reporting an error.
+
 ## Android 0.4.1 / Fusion add-in 3.2.1
 
 - A pairing code is now marked active only after the relay confirms desktop authentication.
