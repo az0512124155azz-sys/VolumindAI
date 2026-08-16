@@ -7,7 +7,7 @@
         android:label="Volumind Remote"
         android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@style/AppTheme"
-        android:roundIcon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:usesCleartextTraffic="false">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>

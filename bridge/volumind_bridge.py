@@ -8,8 +8,11 @@ from websocket import WebSocketApp
 
 RELAY_URL = os.environ["VOLUMIND_RELAY_URL"]
 DEVICE_SECRET = os.environ.get("VOLUMIND_DEVICE_SECRET") or secrets.token_urlsafe(32)
-PAIRING_CODE = os.environ.get("VOLUMIND_PAIRING_CODE") or f"{secrets.randbelow(1_000_000):06d}"
 FUSION_LOCAL_URL = os.environ.get("VOLUMIND_FUSION_URL", "http://127.0.0.1:8765")
+
+def local_get(path):
+    with urllib.request.urlopen(FUSION_LOCAL_URL + path, timeout=5) as response:
+        return json.loads(response.read())
 
 def local_post(path, body):
     data = json.dumps(body).encode()
@@ -18,8 +21,9 @@ def local_post(path, body):
         return json.loads(response.read())
 
 def on_open(ws):
-    ws.send(json.dumps({"type":"authenticate","role":"desktop","pairingCode":PAIRING_CODE,"deviceSecret":DEVICE_SECRET}))
-    print(f"Pair Volumind Remote with code: {PAIRING_CODE}", flush=True)
+    pairing_code = local_get("/pairing")["pairingCode"]
+    ws.send(json.dumps({"type":"authenticate","role":"desktop","pairingCode":pairing_code,"deviceSecret":DEVICE_SECRET}))
+    print(f"Pairing code from Fusion: {pairing_code}", flush=True)
     threading.Thread(target=forward_fusion_events, args=(ws,), daemon=True).start()
 
 def forward_fusion_events(ws):
