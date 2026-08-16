@@ -40,12 +40,12 @@ wss.on('connection', ws => {
         if (secret.length < 32) return reject(ws, 'Weak device secret');
         const previous = codes.get(code);
         if (previous && !safeEqual(previous.secret, secret)) return reject(ws, 'Pairing code already in use');
-        const room = previous?.room || randomUUID(); codes.set(code, {room, secret, expires:Date.now()+10*60_000});
+        const room = previous?.room || randomUUID(); codes.set(code, {room, secret, expires:Date.now()+24*60*60_000});
         ws.auth = {role:'desktop', room}; clients.set(`${room}:desktop`, ws); send(ws, {type:'authenticated', role:'desktop', room}); return;
       }
       if (msg.role === 'mobile') {
         const pair = codes.get(code); if (!pair || pair.expires < Date.now()) return reject(ws, 'Pairing code expired');
-        ws.auth = {role:'mobile', room:pair.room}; clients.set(`${pair.room}:mobile`, ws); codes.delete(code); send(ws, {type:'authenticated', role:'mobile'}); return;
+        ws.auth = {role:'mobile', room:pair.room}; clients.set(`${pair.room}:mobile`, ws); send(ws, {type:'authenticated', role:'mobile'}); return;
       }
       return reject(ws, 'Invalid role');
     }
