@@ -1,0 +1,6 @@
+{
+  "autodeskProduct":"Fusion","type":"addin","author":"Volumind AI",
+  "description":{"":"Local AI assistant for safe parametric modeling with Ollama."},
+  "version":"3.2.0","runOnStartup":true,"supportedOS":"windows|mac",
+  "editEnabled":true,"iconFilename":"AddInIcon.png"
+}
